@@ -1,49 +1,37 @@
 package main
 
 import (
-	"bufio"
-	"fmt"
-	"net"
-	"os"
-	"strings"
+	"flag"
+	"log"
+	"network-monitor/devicemonitor"
+	"network-monitor/bandwidthmonitor"
+	"time"
 )
 
 func main() {
-	// 连接服务器
-	conn, err := net.Dial("tcp", "127.0.0.1:20000")
-	if err != nil {
-		fmt.Println("dial failed, err:", err)
-	}
-	// 关闭连接
-	defer conn.Close()
+	// 定义命令行参数
+	interval := flag.Int("interval", 500, "带宽采样间隔(毫秒)，默认500ms")
 
-	inputReader := bufio.NewReader(os.Stdin)
-	for {
-		// 读取用户输入
-		s, _ := inputReader.ReadString('\n')
-		// 去除字符串两端的空白字符
-		s = strings.TrimSpace(s)
-		// 如果输入 q 则退出
-		if strings.ToUpper(s) == "Q" {
-			return
-		}
+	flag.Parse()
 
-		// 发送数据
-		_, err = conn.Write([]byte(s))
-		if err != nil {
-			fmt.Println("write to server failed, err:", err)
-			return
-		}
+	log.Println("开始高精度网络带宽监控...")
 
-		// 读取服务器返回的数据
-		var buf [1024]byte
-		// 读取数据到缓冲区
-		n, err := conn.Read(buf[:])
-		if err != nil {
-			fmt.Println("read from server failed, err:", err)
-			return
-		}
-		// 打印读取到的数据
-		fmt.Println("read from server:", string(buf[:n]))
-	}
+	// 创建设备监控器
+	deviceMonitor := devicemonitor.NewDeviceMonitor("")
+	defer deviceMonitor.Close()
+
+	// 创建带宽监控器
+	bandwidthMonitor := bandwidthmonitor.NewBandwidthMonitor(deviceMonitor, time.Duration(*interval)*time.Millisecond)
+
+	// 输出监控设置信息
+	log.Printf("采样间隔: %dms，监控周期: %d秒", *interval, time.Second/bandwidthMonitor.GetInterval()*2/5)
+
+
+	log.Println("未指定服务器URL，将只进行本地监控")
+
+	// 启动监控
+	bandwidthMonitor.Start()
+
+	// 保持程序运行，使用信号处理优雅退出
+	bandwidthmonitor.WaitForInterrupt()
 }
