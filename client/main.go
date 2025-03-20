@@ -34,6 +34,7 @@ type Client struct {
 	failureCount  int
 	mutex         sync.Mutex
 	isMonitoring  bool
+	lastSendTime  time.Time
 }
 
 func NewClient(m *bandwidthmonitor.BandwidthMonitor, d *devicemonitor.DeviceMonitor) *Client {
@@ -41,6 +42,7 @@ func NewClient(m *bandwidthmonitor.BandwidthMonitor, d *devicemonitor.DeviceMoni
 		monitor:       m,
 		deviceMonitor: d,
 		isMonitoring:  false,
+		lastSendTime:  time.Time{},
 	}
 }
 
@@ -99,6 +101,14 @@ func (c *Client) sendData(data BandwidthData) error {
 		c.mutex.Unlock()
 		return nil
 	}
+
+	// 确保发送间隔至少为500ms
+	now := time.Now()
+	if now.Sub(c.lastSendTime) < 500*time.Millisecond {
+		c.mutex.Unlock()
+		return nil
+	}
+
 	conn := c.conn
 	c.mutex.Unlock()
 
@@ -116,9 +126,12 @@ func (c *Client) sendData(data BandwidthData) error {
 
 	c.mutex.Lock()
 	c.failureCount = 0
+	c.lastSendTime = now
 	c.mutex.Unlock()
 
-	log.Printf("数据发送成功")
+	log.Printf("数据发送成功 - 上行: %.2f Kbps, 下行: %.2f Kbps",
+		data.UploadSpeed*8/1000,
+		data.DownloadSpeed*8/1000)
 	return nil
 }
 
@@ -199,10 +212,6 @@ func (c *Client) tryReconnect() bool {
 			c.mutex.Unlock()
 			return false
 		}
-		log.Printf("测试数据包 %d/5 发送成功 - 上行: %.2f Kbps, 下行: %.2f Kbps",
-			i+1,
-			data.UploadSpeed*8/1000,
-			data.DownloadSpeed*8/1000)
 		time.Sleep(time.Second)
 	}
 

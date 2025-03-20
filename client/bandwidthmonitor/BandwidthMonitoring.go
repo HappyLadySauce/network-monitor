@@ -349,14 +349,6 @@ func (bm *BandwidthMonitor) Start() {
 			select {
 			case <-ticker.C:
 				bm.stats.CalculateSpeeds()
-
-				// 打印带宽使用情况
-				log.Printf("上行: %s (%.2f %s) | 下行: %s (%.2f %s)",
-					formatBandwidth(bm.stats.UploadSpeed),
-					bm.stats.AvgUploadPacketSize, "字节/包",
-					formatBandwidth(bm.stats.DownloadSpeed),
-					bm.stats.AvgDownloadPacketSize, "字节/包")
-
 			case <-bm.stopChan:
 				return
 			}
@@ -366,16 +358,21 @@ func (bm *BandwidthMonitor) Start() {
 	// 数据包处理协程
 	go func() {
 		for packet := range packetSource.Packets() {
-			// 跳过不完整的包
-			if packet.ErrorLayer() != nil {
-				continue
+			select {
+			case <-bm.stopChan:
+				return
+			default:
+				// 跳过不完整的包
+				if packet.ErrorLayer() != nil {
+					continue
+				}
+
+				// 识别上下行方向
+				isUpload := bm.isUploadPacket(packet)
+
+				// 更新统计数据
+				bm.stats.Update(packet, isUpload)
 			}
-
-			// 识别上下行方向
-			isUpload := bm.isUploadPacket(packet)
-
-			// 更新统计数据
-			bm.stats.Update(packet, isUpload)
 		}
 	}()
 }
