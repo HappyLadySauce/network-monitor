@@ -23,7 +23,7 @@ fi
 cd ..
 
 # 复制client配置文件
-cp client/config/config.yaml "${OUTPUT_DIR}/client/config/"
+cp client/config/config_client.yaml "${OUTPUT_DIR}/client/config/"
 
 # 构建server
 echo "正在构建server..."
@@ -36,7 +36,7 @@ fi
 cd ..
 
 # 复制server配置文件
-cp server/config/config.yaml "${OUTPUT_DIR}/server/config/"
+cp server/config/config_server.yaml "${OUTPUT_DIR}/server/config/"
 
 echo "构建完成！"
 echo "可执行文件和配置文件已放置在 ${OUTPUT_DIR} 目录下"

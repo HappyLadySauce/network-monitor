@@ -27,7 +27,7 @@ var Config *config
 
 // 加载配置文件
 func InitConfig() {
-	viper.SetConfigName("config")
+	viper.SetConfigName("config_server")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("./config")
 
