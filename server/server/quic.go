@@ -89,7 +89,7 @@ func (s *QuicServer) Start() error {
 		return fmt.Errorf("failed to start QUIC server: %v", err)
 	}
 	s.started = true
-	log.Printf("QUIC server started on %s", s.addr)
+	log.Printf("QUIC服务器已启动，监听地址: %s", s.addr)
 
 	// 启动客户端状态检查
 	go s.checkClientsStatus()
