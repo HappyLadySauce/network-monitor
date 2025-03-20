@@ -245,7 +245,7 @@ func (s *QuicServer) handleStream(stream quic.Stream, conn quic.Connection, clie
 		return
 	}
 
-	log.Printf("Successfully saved bandwidth data from client %s (%s)", *clientID, *alias)
+	log.Printf("数据接受成功 - 上行: %.2f Mbps, 下行: %.2f Mbps, 平均上行包大小: %.2f 字节, 平均下行包大小: %.2f 字节, %s (%s)", bandwidthData.UploadSpeed*8/1048576, bandwidthData.DownloadSpeed*8/1048576, bandwidthData.AvgUploadPacketSize, bandwidthData.AvgDownloadPacketSize, *clientID, *alias)
 }
 
 // checkClientsStatus 定期检查客户端状态

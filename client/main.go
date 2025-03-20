@@ -129,9 +129,9 @@ func (c *Client) sendData(data BandwidthData) error {
 	c.lastSendTime = now
 	c.mutex.Unlock()
 
-	log.Printf("数据发送成功 - 上行: %.2f Kbps, 下行: %.2f Kbps",
-		data.UploadSpeed*8/1000,
-		data.DownloadSpeed*8/1000)
+	log.Printf("数据发送成功 - 上行: %.2f Mbps, 下行: %.2f Mbps",
+		data.UploadSpeed*8/1048576,
+		data.DownloadSpeed*8/1048576)
 	return nil
 }
 
