@@ -26,9 +26,6 @@ func main() {
 	// 输出监控设置信息
 	log.Printf("采样间隔: %dms，监控周期: %d秒", *interval, time.Second/bandwidthMonitor.GetInterval()*2/5)
 
-
-	log.Println("未指定服务器URL，将只进行本地监控")
-
 	// 启动监控
 	bandwidthMonitor.Start()
 
