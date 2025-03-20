@@ -1,0 +1,16 @@
+# 服务器配置
+server:
+  host: 127.0.0.1
+  port: 8082
+  max_retry: 5          # 最大重试次数
+  retry_interval: 1m    # 重试间隔时间
+# 客户端配置
+client:
+  id: "client_001"  # 客户端唯一标识
+  alias: "测试客户端"  # 客户端别名
+# 监控配置
+monitor:
+  # 带宽采样间隔(毫秒)
+  sample_interval: 500ms
+  # 数据上报间隔(毫秒)
+  report_interval: 1000ms

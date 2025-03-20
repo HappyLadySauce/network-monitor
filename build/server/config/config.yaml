@@ -1,0 +1,11 @@
+server:
+  host: 0.0.0.0
+  port: 8082
+gin:
+  port: 8081
+database:
+  host: localhost
+  port: 5432
+  user: golang
+  password: Ssddffqxc547
+  name: network_monitor
