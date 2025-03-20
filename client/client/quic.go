@@ -5,16 +5,19 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
-	"network-monitor/config"
+	"network-monitor-client/config"
 
 	"github.com/quic-go/quic-go"
 )
 
 // BandwidthData 带宽数据结构
 type BandwidthData struct {
+	ClientID              string    `json:"client_id"`
+	Alias                 string    `json:"alias"`
 	Timestamp             time.Time `json:"timestamp"`
 	UploadSpeed           float64   `json:"upload_speed"`
 	DownloadSpeed         float64   `json:"download_speed"`
@@ -60,14 +63,33 @@ func SendData(client quic.Connection, data []byte) error {
 
 // SendBandwidthData 发送带宽数据
 func SendBandwidthData(client quic.Connection, data *BandwidthData) error {
+	// 确保数据中包含客户端标识
+	if data.ClientID == "" {
+		data.ClientID = config.Config.Client.ID
+	}
+	if data.Alias == "" {
+		data.Alias = config.Config.Client.Alias
+	}
+
 	// 将数据转换为JSON
 	jsonData, err := json.Marshal(data)
 	if err != nil {
-		return errors.New("数据序列化失败")
+		return fmt.Errorf("数据序列化失败: %v", err)
 	}
 
 	// 发送数据
-	return SendData(client, jsonData)
+	stream, err := client.OpenStreamSync(context.Background())
+	if err != nil {
+		return fmt.Errorf("创建数据流失败: %v", err)
+	}
+	defer stream.Close()
+
+	// 发送数据
+	if _, err := stream.Write(jsonData); err != nil {
+		return fmt.Errorf("发送数据失败: %v", err)
+	}
+
+	return nil
 }
 
 // 接收数据

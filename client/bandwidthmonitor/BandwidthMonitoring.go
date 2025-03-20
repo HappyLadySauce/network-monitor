@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"network-monitor/devicemonitor"
+	"network-monitor-client/devicemonitor"
 	"sort"
 	"sync"
 	"time"
@@ -156,6 +156,13 @@ func (bs *BandwidthStats) isLocalIP(ip net.IP) bool {
 func (bs *BandwidthStats) generateFlowID(srcIP, dstIP string, srcPort, dstPort uint16, protocol string) string {
 	// 根据源目IP、端口、协议生成唯一标识
 	return fmt.Sprintf("%s:%d-%s:%d-%s", srcIP, srcPort, dstIP, dstPort, protocol)
+}
+
+// 记录流量
+func (bs *BandwidthStats) recordFlow(flowID string) {
+	bs.mutex.Lock()
+	defer bs.mutex.Unlock()
+	bs.flowTracker[flowID] = true
 }
 
 // 更新带宽统计
@@ -380,7 +387,7 @@ func (bm *BandwidthMonitor) Stop() {
 
 // isUploadPacket 判断数据包是上行还是下行
 func (bm *BandwidthMonitor) isUploadPacket(packet gopacket.Packet) bool {
-	// 获取网络层（IP层）
+	// 获取IP层
 	ipLayer := packet.Layer(layers.LayerTypeIPv4)
 	if ipLayer == nil {
 		ipLayer = packet.Layer(layers.LayerTypeIPv6)
@@ -389,20 +396,20 @@ func (bm *BandwidthMonitor) isUploadPacket(packet gopacket.Packet) bool {
 	if ipLayer != nil {
 		var srcIP, dstIP net.IP
 		var srcPort, dstPort uint16
-		var protocol string
+		protocol := "IP"
 
-		// 根据IP版本获取源IP和目的IP
-		if ipv4, ok := ipLayer.(*layers.IPv4); ok {
+		// 根据IP版本获取源目IP
+		if ipv4Layer := packet.Layer(layers.LayerTypeIPv4); ipv4Layer != nil {
+			ipv4, _ := ipv4Layer.(*layers.IPv4)
 			srcIP = ipv4.SrcIP
 			dstIP = ipv4.DstIP
-			protocol = "IPv4"
-		} else if ipv6, ok := ipLayer.(*layers.IPv6); ok {
+		} else if ipv6Layer := packet.Layer(layers.LayerTypeIPv6); ipv6Layer != nil {
+			ipv6, _ := ipv6Layer.(*layers.IPv6)
 			srcIP = ipv6.SrcIP
 			dstIP = ipv6.DstIP
-			protocol = "IPv6"
 		}
 
-		// 获取传输层信息
+		// 获取传输层端口信息
 		if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
 			tcp, _ := tcpLayer.(*layers.TCP)
 			srcPort = uint16(tcp.SrcPort)
@@ -418,7 +425,7 @@ func (bm *BandwidthMonitor) isUploadPacket(packet gopacket.Packet) bool {
 		// 生成五元组
 		flowID := bm.stats.generateFlowID(srcIP.String(), dstIP.String(), srcPort, dstPort, protocol)
 		// 记录流量（可选，目前仅用于防止内存泄漏）
-		bm.stats.flowTracker[flowID] = true
+		bm.stats.recordFlow(flowID)
 
 		// 检查源IP和目的IP是否在本地网络
 		srcIsLocal := bm.stats.isLocalIP(srcIP)

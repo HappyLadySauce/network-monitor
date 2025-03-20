@@ -22,6 +22,8 @@ import (
 
 // BandwidthData 带宽数据结构
 type BandwidthData struct {
+	ClientID              string    `json:"client_id"`
+	Alias                 string    `json:"alias"`
 	Timestamp             time.Time `json:"timestamp"`
 	UploadSpeed           float64   `json:"upload_speed"`
 	DownloadSpeed         float64   `json:"download_speed"`
@@ -36,6 +38,14 @@ type QuicServer struct {
 	ctx         context.Context
 	cancel      context.CancelFunc
 	connections sync.WaitGroup
+	clients     sync.Map // 存储活跃的客户端连接
+}
+
+type ClientConnection struct {
+	ID       string
+	Alias    string
+	Conn     quic.Connection
+	LastSeen time.Time
 }
 
 func NewQuicServer(addr string) *QuicServer {
@@ -81,6 +91,9 @@ func (s *QuicServer) Start() error {
 	s.started = true
 	log.Printf("QUIC server started on %s", s.addr)
 
+	// 启动客户端状态检查
+	go s.checkClientsStatus()
+
 	// 使用 context 控制接受连接的循环
 	for {
 		select {
@@ -90,7 +103,6 @@ func (s *QuicServer) Start() error {
 			conn, err := s.listener.Accept(s.ctx)
 			if err != nil {
 				if s.ctx.Err() != nil {
-					// 正常关闭情况
 					return nil
 				}
 				log.Printf("Failed to accept connection: %v", err)
@@ -110,25 +122,36 @@ func (s *QuicServer) Stop() error {
 		return nil
 	}
 
-	// 取消 context，通知所有 goroutine 退出
 	s.cancel()
 
-	// 关闭监听器
 	if s.listener != nil {
 		if err := s.listener.Close(); err != nil {
 			log.Printf("Error closing QUIC listener: %v", err)
 		}
 	}
 
-	// 等待所有连接处理完成
+	// 关闭所有客户端连接
+	s.clients.Range(func(key, value interface{}) bool {
+		if client, ok := value.(*ClientConnection); ok {
+			client.Conn.CloseWithError(0, "server shutdown")
+		}
+		return true
+	})
+
 	s.connections.Wait()
 	s.started = false
 	return nil
 }
 
 func (s *QuicServer) handleConnection(conn quic.Connection) {
-	log.Printf("New connection from %s", conn.RemoteAddr())
-	defer conn.CloseWithError(0, "connection closed")
+	var clientID, alias string
+	defer func() {
+		if clientID != "" {
+			s.clients.Delete(clientID)
+			log.Printf("Client %s (%s) disconnected", clientID, alias)
+		}
+		conn.CloseWithError(0, "connection closed")
+	}()
 
 	for {
 		select {
@@ -144,22 +167,20 @@ func (s *QuicServer) handleConnection(conn quic.Connection) {
 				return
 			}
 
-			s.handleStream(stream)
+			s.handleStream(stream, conn, &clientID, &alias)
 		}
 	}
 }
 
-func (s *QuicServer) handleStream(stream quic.Stream) {
+func (s *QuicServer) handleStream(stream quic.Stream, conn quic.Connection, clientID *string, alias *string) {
 	defer stream.Close()
 
-	// 设置读取超时
 	deadline := time.Now().Add(5 * time.Second)
 	if err := stream.SetReadDeadline(deadline); err != nil {
 		log.Printf("Failed to set read deadline: %v", err)
 		return
 	}
 
-	// 读取数据
 	data, err := io.ReadAll(stream)
 	if err != nil {
 		if err != io.EOF {
@@ -168,7 +189,6 @@ func (s *QuicServer) handleStream(stream quic.Stream) {
 		return
 	}
 
-	// 检查数据是否为空
 	if len(data) == 0 {
 		return
 	}
@@ -179,14 +199,42 @@ func (s *QuicServer) handleStream(stream quic.Stream) {
 		return
 	}
 
+	// 验证和更新客户端信息
+	if *clientID == "" {
+		*clientID = bandwidthData.ClientID
+		*alias = bandwidthData.Alias
+
+		// 注册客户端
+		if err := database.RegisterClient(*clientID, *alias); err != nil {
+			log.Printf("Failed to register client: %v", err)
+			return
+		}
+
+		// 存储客户端连接信息
+		s.clients.Store(*clientID, &ClientConnection{
+			ID:       *clientID,
+			Alias:    *alias,
+			Conn:     conn,
+			LastSeen: time.Now(),
+		})
+
+		log.Printf("New client registered: %s (%s)", *clientID, *alias)
+	}
+
+	// 更新客户端最后活动时间
+	if client, ok := s.clients.Load(*clientID); ok {
+		client.(*ClientConnection).LastSeen = time.Now()
+	}
+
 	// 验证数据有效性
 	if bandwidthData.Timestamp.IsZero() {
 		log.Printf("Invalid bandwidth data: timestamp is zero")
 		return
 	}
 
-	// 使用新的数据库操作方法保存带宽数据
+	// 保存带宽数据
 	err = database.SaveBandwidthData(
+		*clientID,
 		bandwidthData.Timestamp,
 		bandwidthData.UploadSpeed,
 		bandwidthData.DownloadSpeed,
@@ -197,10 +245,42 @@ func (s *QuicServer) handleStream(stream quic.Stream) {
 		return
 	}
 
-	log.Printf("Successfully saved bandwidth data from stream")
+	log.Printf("Successfully saved bandwidth data from client %s (%s)", *clientID, *alias)
 }
 
-// 关闭连接
-func closeConnection(conn quic.Connection) {
-	conn.CloseWithError(0, "QUIC连接已关闭")
+// checkClientsStatus 定期检查客户端状态
+func (s *QuicServer) checkClientsStatus() {
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-ticker.C:
+			now := time.Now()
+			s.clients.Range(func(key, value interface{}) bool {
+				client := value.(*ClientConnection)
+				// 如果客户端超过5分钟没有活动，关闭连接
+				if now.Sub(client.LastSeen) > 5*time.Minute {
+					log.Printf("Client %s (%s) inactive for too long, closing connection", client.ID, client.Alias)
+					client.Conn.CloseWithError(0, "inactive timeout")
+					s.clients.Delete(key)
+				}
+				return true
+			})
+		}
+	}
+}
+
+// GetConnectedClients 获取当前连接的客户端列表
+func (s *QuicServer) GetConnectedClients() []*ClientConnection {
+	var clients []*ClientConnection
+	s.clients.Range(func(_, value interface{}) bool {
+		if client, ok := value.(*ClientConnection); ok {
+			clients = append(clients, client)
+		}
+		return true
+	})
+	return clients
 }
