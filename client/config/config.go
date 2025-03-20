@@ -2,6 +2,7 @@ package config
 
 import (
 	"log"
+	"time"
 
 	"github.com/spf13/viper"
 )
@@ -11,16 +12,10 @@ type config struct {
 		Host string `mapstructure:"host"`
 		Port string `mapstructure:"port"`
 	} `mapstructure:"server"`
-	Gin struct {
-		Port string `mapstructure:"port"`
-	} `mapstructure:"gin"`
-	Database struct {
-		Host     string `mapstructure:"host"`
-		Port     string `mapstructure:"port"`
-		User     string `mapstructure:"user"`
-		Password string `mapstructure:"password"`
-		Name     string `mapstructure:"name"`
-	} `mapstructure:"database"`
+	Monitor struct {
+		SampleInterval time.Duration `mapstructure:"sample_interval"`
+		ReportInterval time.Duration `mapstructure:"report_interval"`
+	} `mapstructure:"monitor"`
 }
 
 var Config *config
@@ -38,6 +33,14 @@ func InitConfig() {
 	var config config
 	if err := viper.Unmarshal(&config); err != nil {
 		log.Fatalf("解析配置文件失败: %v", err)
+	}
+
+	// 设置默认值
+	if config.Monitor.SampleInterval == 0 {
+		config.Monitor.SampleInterval = 500 * time.Millisecond
+	}
+	if config.Monitor.ReportInterval == 0 {
+		config.Monitor.ReportInterval = 1000 * time.Millisecond
 	}
 
 	Config = &config
