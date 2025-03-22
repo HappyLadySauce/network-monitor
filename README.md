@@ -94,7 +94,7 @@ Network Monitor 是一个用于监控远端服务器网络数据的工具，包�
   - 管理客户端会话
   - 实现多客户端支持
 
-## 安装说明
+## 源码安装说明
 
 ### 前置要求
 - Go 1.18 或更高版本
@@ -122,6 +122,18 @@ cd network-monitoring
 3. 编译项目：
 ```bash
 ./build.sh
+```
+
+### 启动服务端
+```bash
+cd build/server
+./server
+```
+
+### 启动客户端
+```bash
+cd build/client
+sudo ./client  # 需要root权限以捕获网络数据包
 ```
 
 ## 配置说明
@@ -157,18 +169,78 @@ database:
   password: postgres   # 数据库密码
 ```
 
-## 使用方法
+## 系统服务配置
 
-### 启动服务端
+为了使程序能够作为系统服务运行，我们提供了systemd配置方案。
+
+### 服务端配置
+
+1. 创建程序目录并下载程序：
 ```bash
-cd build/server
-./server
+sudo mkdir /opt/network-moniter && cd /opt/network-moniter
+sudo wget https://github.com/HappyLadySauce/network-monitor/releases/download/v1.0.0/server \
+     https://github.com/HappyLadySauce/network-monitor/releases/download/v1.0.0/config_server.yaml
+sudo chmod +x server
 ```
 
-### 启动客户端
+2. 创建systemd服务配置文件 `/etc/systemd/system/network-monitor.service`：
+```ini
+[Unit]
+Description=network monitor Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/network-moniter
+ExecStart=/opt/network-monitor/server
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
+```
+
+3. 启动服务：
 ```bash
-cd build/client
-sudo ./client  # 需要root权限以捕获网络数据包
+systemctl daemon-reload
+systemctl start network-monitor
+systemctl enable network-monitor  # 设置开机自启
+```
+
+### 客户端配置
+
+1. 创建程序目录并下载程序：
+```bash
+sudo mkdir /opt/network-moniter && cd /opt/network-moniter
+sudo wget https://github.com/HappyLadySauce/network-monitor/releases/download/v1.0.0/client \
+     https://github.com/HappyLadySauce/network-monitor/releases/download/v1.0.0/config_client.yaml
+sudo chmod +x client
+```
+
+2. 创建systemd服务配置文件 `/etc/systemd/system/network-monitor.service`：
+```ini
+[Unit]
+Description=network monitor Client
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/network-moniter
+ExecStart=/opt/network-monitor/client
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
+```
+
+3. 启动服务：
+```bash
+systemctl daemon-reload
+systemctl start network-monitor
+systemctl enable network-monitor  # 设置开机自启
 ```
 
 ## 数据存储
