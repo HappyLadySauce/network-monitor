@@ -177,7 +177,7 @@ database:
 
 1. 创建程序目录并下载程序：
 ```bash
-sudo mkdir /opt/network-moniter && cd /opt/network-moniter
+sudo mkdir /opt/network-monitor && cd /opt/network-monitor
 sudo wget https://github.com/HappyLadySauce/network-monitor/releases/download/v1.0.0/server \
      https://github.com/HappyLadySauce/network-monitor/releases/download/v1.0.0/config_server.yaml
 sudo chmod +x server
@@ -192,7 +192,7 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/network-moniter
+WorkingDirectory=/opt/network-monitor
 ExecStart=/opt/network-monitor/server
 Restart=on-failure
 RestartSec=5s
@@ -212,7 +212,7 @@ systemctl enable network-monitor  # 设置开机自启
 
 1. 创建程序目录并下载程序：
 ```bash
-sudo mkdir /opt/network-moniter && cd /opt/network-moniter
+sudo mkdir /opt/network-monitor && cd /opt/network-monitor
 sudo wget https://github.com/HappyLadySauce/network-monitor/releases/download/v1.0.0/client \
      https://github.com/HappyLadySauce/network-monitor/releases/download/v1.0.0/config_client.yaml
 sudo chmod +x client
@@ -227,7 +227,7 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/network-moniter
+WorkingDirectory=/opt/network-monitor
 ExecStart=/opt/network-monitor/client
 Restart=on-failure
 RestartSec=5s
