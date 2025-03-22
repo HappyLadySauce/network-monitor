@@ -30,7 +30,7 @@ var Config Configuration
 func Init() error {
 	viper.SetConfigName("config_client")
 	viper.SetConfigType("yaml")
-	viper.AddConfigPath("config/")
+	viper.AddConfigPath(".")
 
 	if err := viper.ReadInConfig(); err != nil {
 		return fmt.Errorf("读取配置文件失败: %v", err)

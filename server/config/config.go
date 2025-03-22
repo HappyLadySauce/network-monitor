@@ -29,7 +29,7 @@ var Config *config
 func InitConfig() {
 	viper.SetConfigName("config_server")
 	viper.SetConfigType("yaml")
-	viper.AddConfigPath("./config")
+	viper.AddConfigPath(".")
 
 	if err := viper.ReadInConfig(); err != nil {
 		log.Fatalf("读取配置文件失败: %v", err)
