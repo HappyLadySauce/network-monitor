@@ -7,7 +7,7 @@
 创建程序目录
 
 ```bash
-sudo mkdir /opt/network-moniter && cd /opt/network-moniter
+sudo mkdir /opt/network-monitor && cd /opt/network-monitor
 ```
 
 通过 `wget` 下载程序
@@ -33,7 +33,7 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/network-moniter
+WorkingDirectory=/opt/network-monitor
 ExecStart=/opt/network-monitor/server
 Restart=on-failure
 RestartSec=5s
@@ -67,7 +67,7 @@ systemctl enable network-monitor
 创建程序目录
 
 ```bash
-sudo mkdir /opt/network-moniter && cd /opt/network-moniter
+sudo mkdir /opt/network-monitor && cd /opt/network-monitor
 ```
 
 通过 `wget` 下载程序
@@ -93,7 +93,7 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/network-moniter
+WorkingDirectory=/opt/network-monitor
 ExecStart=/opt/network-monitor/client
 Restart=on-failure
 RestartSec=5s
